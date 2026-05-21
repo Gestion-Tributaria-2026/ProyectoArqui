@@ -7,6 +7,7 @@ interface Cliente {
   id: string;
   nombre: string;
   cuit: string;
+  estado: "al_dia" | "pendiente";
 }
 
 interface DashboardAdminProps {
@@ -56,7 +57,7 @@ export default function DashboardAdmin({ adminName, clientesData }: DashboardAdm
                       <p className="text-xs text-slate-400 mt-0.5">CUIT: {cli.cuit}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="badge-paid">Al día</span>
+                      <span className={cli.estado === "pendiente" ? "badge-pending" : "badge-paid"}>{cli.estado === "pendiente" ? "Pendiente" : "Al día"}</span>
                       <button className="btn-action-outline">Gestionar</button>
                     </div>
                   </div>

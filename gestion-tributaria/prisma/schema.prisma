@@ -4,21 +4,22 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model administrador {
-  cuil             Int               @id(map: "cuil") @default(autoincrement())
+  cuil             BigInt            @id(map: "cuil")
   id_estudio       Int?
+  usuario          usuario           @relation(fields: [cuil], references: [CUIL_usuario], onDelete: NoAction, onUpdate: NoAction, map: "cuil_usuario")
   estudio_contable estudio_contable? @relation(fields: [id_estudio], references: [id_estudio], onDelete: NoAction, onUpdate: NoAction, map: "id_estudio")
   turno            turno[]
 }
 
 model cliente {
-  cuil             Int               @id @default(autoincrement())
+  cuil             BigInt            @id
   id_estudio       Int?
+  usuario          usuario           @relation(fields: [cuil], references: [CUIL_usuario], onDelete: NoAction, onUpdate: NoAction, map: "cuil_usuario")
   estudio_contable estudio_contable? @relation(fields: [id_estudio], references: [id_estudio], onDelete: NoAction, onUpdate: NoAction, map: "id_estudio")
-  inscripto_en     inscripto_en?
+  inscripto_en     inscripto_en[]
   liquidacion      liquidacion[]
   turno            turno[]
 }
@@ -51,10 +52,12 @@ model impuesto {
 
 model inscripto_en {
   clave              String?
-  cuil_cliente       Int                 @id @default(autoincrement())
-  id_entidad         Int?
-  cliente            cliente             @relation(fields: [cuil_cliente], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_cliente")
-  entidad_tributaria entidad_tributaria? @relation(fields: [id_entidad], references: [id_entidad], onDelete: NoAction, onUpdate: NoAction, map: "id_entidad")
+  cuil_cliente       BigInt
+  id_entidad         Int
+  cliente            cliente            @relation(fields: [cuil_cliente], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_cliente")
+  entidad_tributaria entidad_tributaria @relation(fields: [id_entidad], references: [id_entidad], onDelete: NoAction, onUpdate: NoAction, map: "id_entidad")
+
+  @@id([cuil_cliente, id_entidad])
 }
 
 model liquidacion {
@@ -62,7 +65,7 @@ model liquidacion {
   periodo_fiscal            DateTime?    @db.Date
   importe                   Float?       @db.Real
   estado                    String?
-  cuil_cliente              Int?
+  cuil_cliente              BigInt?
   id_impuesto               Int?
   numero_boleta_comprobante Int?
   cliente                   cliente?     @relation(fields: [cuil_cliente], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_cliente")
@@ -70,27 +73,32 @@ model liquidacion {
   comprobante               comprobante? @relation(fields: [numero_boleta_comprobante], references: [numero_boleta], onDelete: NoAction, onUpdate: NoAction, map: "numero_boleta")
 }
 
-model playing_with_neon {
-  id    Int    @id @default(autoincrement())
-  name  String
-  value Float? @db.Real
-}
-
-model turno {
-  fecha         DateTime       @db.Date
-  hora          DateTime       @db.Time(0)
-  cuil_admin    Int?
-  cuil_cliente  Int?
-  administrador administrador? @relation(fields: [cuil_admin], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_admin")
-  cliente       cliente?       @relation(fields: [cuil_cliente], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_cliente")
-
-  @@id([fecha, hora], map: "pk_turno")
-}
-
 model usuario {
-  CUIL_usuario     Int     @id @default(autoincrement())
+  CUIL_usuario     BigInt         @id @default(autoincrement())
   nombre_usuario   String?
   apellido_usuario String?
   email            String?
   telefono         Int?
+  administrador    administrador?
+  cliente          cliente?
+}
+
+model clerk_user {
+  id        String   @id
+  email     String?
+  firstName String?
+  lastName  String?
+  cuil      String?
+  createdAt DateTime @default(now())
+}
+
+model turno {
+  fecha         DateTime      @db.Date
+  hora          DateTime      @db.Time(0)
+  cuil_admin    BigInt
+  cuil_cliente  BigInt
+  administrador administrador @relation(fields: [cuil_admin], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_admin")
+  cliente       cliente       @relation(fields: [cuil_cliente], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_cliente")
+
+  @@id([fecha, hora, cuil_admin, cuil_cliente], map: "pk_turno")
 }

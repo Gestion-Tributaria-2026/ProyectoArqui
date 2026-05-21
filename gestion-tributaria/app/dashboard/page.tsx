@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "../../lib/prisma"; // Tu instancia configurada de Prisma
 import DashboardClient from "@/components/dashboard-client";
 import DashboardAdmin from "@/components/dashboard-admin";
+import CuilSetup from "@/components/cuil-setup";
 
 export default async function DashboardPage() {
   // 1. Validamos la sesión de Clerk de forma segura en el servidor
@@ -13,30 +14,64 @@ export default async function DashboardPage() {
   const userEmail = user?.emailAddresses[0]?.emailAddress;
 
   if (!userEmail) {
-    redirect("/");
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
+        <h1 className="text-3xl font-bold mb-4">Cuenta incompleta</h1>
+        <p className="text-slate-600 max-w-xl">
+          No se pudo obtener el correo electrónico de tu sesión de Clerk. Por favor revisá tu cuenta o contactá al administrador.
+        </p>
+      </div>
+    );
   }
 
-  // Sacamos el nombre legible directo de Clerk para no depender de campos inexistentes en BD
+  // Sacamos el nombre legible directo de Clerk
   const nombreUsuarioClerk = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Usuario";
 
-  // Obtenemos el CUIL guardado en los publicMetadata de Clerk
-  const userCuil = user?.publicMetadata?.cuil as number | undefined;
+  // Replicamos el usuario autenticado en clerk_user (Neon)
+  const clerkUser = await db.clerk_user.upsert({
+    where: { id: userId },
+    create: {
+      id: userId,
+      email: userEmail,
+      firstName: user?.firstName || undefined,
+      lastName: user?.lastName || undefined,
+    },
+    update: {
+      email: userEmail,
+      firstName: user?.firstName || undefined,
+      lastName: user?.lastName || undefined,
+    },
+  });
 
-  if (!userCuil) {
-    // Si todavía no configuraste el CUIL en el metadata de este usuario de Clerk,
-    // te redirige temporalmente para evitar que explote la consulta.
-    redirect("/");
+  // También replicamos en la tabla usuario si no existe
+  const usuarioExistente = await db.usuario.findFirst({ where: { email: userEmail } });
+  if (!usuarioExistente) {
+    await db.usuario.create({
+      data: {
+        email: userEmail,
+        nombre_usuario: user?.firstName || undefined,
+        apellido_usuario: user?.lastName || undefined,
+      },
+    });
   }
+
+  const userCuil = typeof clerkUser.cuil === "string" ? clerkUser.cuil.replace(/\D/g, "") : undefined;
+  if (!userCuil || !/^\d{11}$/.test(userCuil)) {
+    return <CuilSetup userName={nombreUsuarioClerk} />;
+  }
+
+  const userCuilNumber = BigInt(userCuil);
 
   // 2. Buscamos primero si este CUIL pertenece a la tabla de administradores
   const dbAdmin = await db.administrador.findUnique({
-    where: { cuil: userCuil },
-    select: { cuil: true }
+    where: { cuil: userCuilNumber },
+    select: { cuil: true, id_estudio: true }
   });
 
   // 3. VISTA ADMINISTRADOR (Vistas 9 y 11)
   if (dbAdmin) {
     const clientes = await db.cliente.findMany({
+      where: { id_estudio: dbAdmin.id_estudio },
       select: { 
         cuil: true, 
         liquidacion: {
@@ -52,7 +87,7 @@ export default async function DashboardPage() {
       id: c.cuil.toString(),
       nombre: `Cliente CUIL: ${c.cuil}`, 
       cuit: c.cuil.toString(),
-      estado: c.liquidacion.some(l => l.estado?.toUpperCase() === "PENDIENTE") ? "pendiente" : "al_dia"
+      estado: c.liquidacion.some(l => l.estado?.toUpperCase() === "PENDIENTE") ? ("pendiente" as const) : ("al_dia" as const)
     }));
 
     return <DashboardAdmin adminName={nombreUsuarioClerk} clientesData={clientesData} />;
@@ -60,7 +95,7 @@ export default async function DashboardPage() {
 
   // 4. VISTA CLIENTE (Vistas 3, 4 y 5) - Si no entró en el if de Admin
   const dbCliente = await db.cliente.findUnique({
-    where: { cuil: userCuil },
+    where: { cuil: userCuilNumber },
     include: {
       liquidacion: {
         include: {
@@ -71,9 +106,16 @@ export default async function DashboardPage() {
     }
   });
 
-  // Si no está registrado físicamente en Neon, lo sacamos
+  // Si no está registrado físicamente en Neon, mostramos feedback en vez de redireccionar.
   if (!dbCliente) {
-    redirect("/"); 
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 text-center">
+        <h1 className="text-3xl font-bold mb-4">Cuenta no registrada</h1>
+        <p className="text-slate-600 max-w-xl">
+          No hay un contribuyente asociado a ese CUIL en la base de datos. Verificá tu CUIL o contactá al soporte.
+        </p>
+      </div>
+    );
   }
 
   // Formateamos las liquidaciones respetando los nombres estrictos de tu schema.prisma
