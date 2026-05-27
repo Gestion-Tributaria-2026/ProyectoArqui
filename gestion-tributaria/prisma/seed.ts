@@ -95,22 +95,7 @@ async function main() {
     });
   }
 
-  console.log("Creando comprobantes...");
-  const comprobantes: { id: number; mes: number }[] = [];
-  const montos = [15000.50, 22300.00, 18750.75, 31200.00, 9800.25, 45000.00, 12450.00, 27600.00, 19200.50, 35000.00, 8700.00, 52000.00];
-  for (let i = 0; i < 12; i++) {
-    const c = await prisma.comprobante.create({
-      data: { periodo_fiscal: new Date(2024, i, 15), importe: montos[i] },
-    });
-    comprobantes.push({ id: c.numero_boleta, mes: i });
-  }
-
-  const comprobantePorMes: Record<number, number> = {};
-  for (const c of comprobantes) {
-    comprobantePorMes[c.mes] = c.id;
-  }
-
-  console.log("Creando liquidaciones...");
+  console.log("Creando liquidaciones y comprobantes...");
   const liquidacionesData = [
     { cuil: "20123456781", impuesto: "IVA", mes: 0, importe: 15000.50, estado: "PAGADO" },
     { cuil: "20123456781", impuesto: "Ganancias", mes: 1, importe: 22300.00, estado: "PENDIENTE" },
@@ -130,6 +115,13 @@ async function main() {
   ];
 
   for (const liq of liquidacionesData) {
+    let idComprobante: number | undefined;
+    if (liq.estado === "PAGADO") {
+      const comprobante = await prisma.comprobante.create({
+        data: { periodo_fiscal: new Date(2024, liq.mes, 15), importe: liq.importe },
+      });
+      idComprobante = comprobante.numero_boleta;
+    }
     await prisma.liquidacion.create({
       data: {
         periodo_fiscal: new Date(2024, liq.mes, 15),
@@ -137,7 +129,7 @@ async function main() {
         estado: liq.estado,
         cuil_cliente: BigInt(liq.cuil),
         id_impuesto: impuestoPorNombre[liq.impuesto],
-        numero_boleta_comprobante: comprobantePorMes[liq.mes],
+        numero_boleta_comprobante: idComprobante,
       },
     });
   }
@@ -197,8 +189,8 @@ async function main() {
   console.log("- 8 clientes creados");
   console.log("- 4 entidades tributarias");
   console.log("- 5 impuestos");
-  console.log("- 12 comprobantes");
   console.log("- 15 liquidaciones");
+  console.log("- 7 comprobantes");
   console.log("- 12 inscripciones");
   console.log("- 5 turnos");
 }

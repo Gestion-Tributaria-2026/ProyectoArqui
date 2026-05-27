@@ -20,7 +20,7 @@ CREATE TABLE administrador (
     id_estudio INTEGER,
     CONSTRAINT administrador_pkey PRIMARY KEY (cuil),
     CONSTRAINT cuil_usuario FOREIGN KEY (cuil) REFERENCES usuario(cuil),
-    CONSTRAINT id_estudio FOREIGN KEY (id_estudio) REFERENCES estudio_eontable(id_estudio)
+    CONSTRAINT id_estudio FOREIGN KEY (id_estudio) REFERENCES estudio_contable(id_estudio)
 );
 
 -- Creación de la tabla Clientes (Especialización de Usuarios)
@@ -29,7 +29,7 @@ CREATE TABLE cliente (
     id_estudio INTEGER,
     CONSTRAINT cliente_pkey PRIMARY KEY (cuil),
     CONSTRAINT cuil_usuario FOREIGN KEY (cuil) REFERENCES usuario(cuil),
-    CONSTRAINT id_estudio FOREIGN KEY (id_estudio) REFERENCES estudio_eontable(id_estudio)
+    CONSTRAINT id_estudio FOREIGN KEY (id_estudio) REFERENCES estudio_contable(id_estudio)
 );
 
 -- Creación de la tabla Entidad Tributaria
@@ -52,7 +52,7 @@ CREATE TABLE Comprobante (
     numero_boleta INTEGER,
     periodo_fiscal DATE,
     importe REAL,
-    CONSTRAINT comprobante_pkey PRIMARY KEY (numero_boleta),
+    CONSTRAINT comprobante_pkey PRIMARY KEY (numero_boleta)
 );
 
 -- Creación de la tabla Liquidacion
@@ -63,8 +63,8 @@ CREATE TABLE liquidacion (
     estado TEXT,
     id_impuesto INTEGER,
 	cuil_cliente INTEGER,
-	numero_boleta_comprobante INTEGER,
-    CONSTRAINT liquidacion_pkey PRIMARY KEY (Nro_Boleta),
+	numero_boleta_comprobante INTEGER UNIQUE,  -- Relación 1:1 (cada liquidación tiene su propio comprobante)
+    CONSTRAINT liquidacion_pkey PRIMARY KEY (numero_boleta),
     CONSTRAINT id_impuesto FOREIGN KEY (id_impuesto) REFERENCES impuesto(id_impuesto),
 	CONSTRAINT numero_boleta FOREIGN KEY (numero_boleta_comprobante) REFERENCES comprobante(numero_boleta),
 	CONSTRAINT cuil_cliente FOREIGN KEY (cuil_cliente) REFERENCES cliente(cuil)
@@ -87,6 +87,12 @@ CREATE TABLE inscripto_en (
     id_entidad INTEGER,
     clave TEXT,
     CONSTRAINT inscripto_en_pkey PRIMARY KEY (cuil_cliente, id_entidad),
-    CONSTRAINT cuil_cliente FOREIGN KEY (cuil) REFERENCES cliente(cuil),
+    CONSTRAINT cuil_cliente FOREIGN KEY (cuil_cliente) REFERENCES cliente(cuil),
     CONSTRAINT id_entidad FOREIGN KEY (id_entidad) REFERENCES entidad_tributaria(id_entidad)
 );
+
+-- Nota sobre autenticación:
+-- La autenticación se maneja externamente con Clerk.
+-- Los usuarios se registran e identifican mediante Clerk, y el CUIL se vincula
+-- en una tabla aparte (clerk_user) para asociar la identidad de Clerk con los
+-- datos del sistema. No se almacenan contraseñas en la base de datos del sistema.

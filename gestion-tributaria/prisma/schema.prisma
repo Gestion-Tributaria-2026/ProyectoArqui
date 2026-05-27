@@ -28,7 +28,7 @@ model comprobante {
   numero_boleta  Int           @id @default(autoincrement())
   periodo_fiscal DateTime?     @db.Date
   importe        Float?        @db.Real
-  liquidacion    liquidacion[]
+  liquidacion    liquidacion?
 }
 
 model entidad_tributaria {
@@ -67,7 +67,7 @@ model liquidacion {
   estado                    String?
   cuil_cliente              BigInt?
   id_impuesto               Int?
-  numero_boleta_comprobante Int?
+  numero_boleta_comprobante Int? @unique
   cliente                   cliente?     @relation(fields: [cuil_cliente], references: [cuil], onDelete: NoAction, onUpdate: NoAction, map: "cuil_cliente")
   impuesto                  impuesto?    @relation(fields: [id_impuesto], references: [id_impuesto], onDelete: NoAction, onUpdate: NoAction, map: "id_impuesto")
   comprobante               comprobante? @relation(fields: [numero_boleta_comprobante], references: [numero_boleta], onDelete: NoAction, onUpdate: NoAction, map: "numero_boleta")
