@@ -14,11 +14,11 @@ CREATE TABLE usuario (
     CONSTRAINT usuario_pkey PRIMARY KEY (CUIL_usuario)
 );
 
--- Creación de la tabla Administradores (Especialización de Usuarios)
-CREATE TABLE administrador (
+-- Creación de la tabla Contadores (Especialización de Usuarios)
+CREATE TABLE contador (
     cuil INTEGER,
     id_estudio INTEGER,
-    CONSTRAINT administrador_pkey PRIMARY KEY (cuil),
+    CONSTRAINT cliente_pkey PRIMARY KEY (cuil),
     CONSTRAINT cuil_usuario FOREIGN KEY (cuil) REFERENCES usuario(cuil),
     CONSTRAINT id_estudio FOREIGN KEY (id_estudio) REFERENCES estudio_contable(id_estudio)
 );
@@ -70,15 +70,15 @@ CREATE TABLE liquidacion (
 	CONSTRAINT cuil_cliente FOREIGN KEY (cuil_cliente) REFERENCES cliente(cuil)
 );
 
--- Tabla Turno (Relación entre Clientes y Administradores con Fecha/Hora)
+-- Tabla Turno (Relación entre Clientes y Contadores con Fecha/Hora)
 CREATE TABLE turno (
     cuil_cliente INTEGER,
-    cuil_admin INTEGER,
+    cuil_contador INTEGER,
     fecha DATE,
     hora TIME,
-    CONSTRAINT pk_turno PRIMARY KEY (cuil_cliente, cuil_admin, fecha, hora),
+    CONSTRAINT pk_turno PRIMARY KEY (cuil_cliente, cuil_contador, fecha, hora),
     CONSTRAINT cuil_cliente FOREIGN KEY (cuil_cliente) REFERENCES cliente(cuil),
-    CONSTRAINT cuil_admin FOREIGN KEY (cuil_admin) REFERENCES administrador(cuil)
+    CONSTRAINT cuil_contador FOREIGN KEY (cuil_contador) REFERENCES contador(cuil)
 );
 
 -- Tabla Inscripto_en (Relación entre Clientes/Usuarios y Entidades Tributarias)

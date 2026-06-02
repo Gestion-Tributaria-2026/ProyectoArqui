@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import { saveCuil } from "../../lib/actions/auth.actions";
-import { User, Info, Loader2 } from "lucide-react";
+import { User, Info, Loader2, LogOut } from "lucide-react";
 
 interface CuilSetupProps {
   userName: string;
@@ -11,6 +12,7 @@ interface CuilSetupProps {
 
 export default function CuilSetup({ userName }: CuilSetupProps) {
   const router = useRouter();
+  const { signOut } = useClerk();
   const [cuil, setCuil] = useState("");
   const [status, setStatus] = useState<{ type: "idle" | "saving" | "success" | "error"; message?: string }>({ type: "idle" });
 
@@ -91,6 +93,15 @@ export default function CuilSetup({ userName }: CuilSetupProps) {
               ) : (
                 "Guardar CUIL"
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => signOut({ redirectUrl: "/sign-in" })}
+              className="w-full rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 flex items-center justify-center gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
             </button>
 
             {status.type === "error" && (
