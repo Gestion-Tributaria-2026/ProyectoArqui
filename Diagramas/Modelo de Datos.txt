@@ -14,7 +14,7 @@ CREATE TABLE usuario (
     CONSTRAINT usuario_pkey PRIMARY KEY (CUIL_usuario)
 );
 
--- Creación de la tabla Contadores (Especialización de Usuarios)
+-- Creación de la tabla Administradores/Contadores (Especialización de Usuarios)
 CREATE TABLE contador (
     cuil INTEGER,
     id_estudio INTEGER,

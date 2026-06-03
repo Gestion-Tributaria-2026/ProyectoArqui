@@ -1,0 +1,346 @@
+openapi: 3.0.3
+info:
+  title: API de Comunicación - Sistema de Gestión Tributaria Integral
+  description: Contrato de diseño de APIs para los módulos de comunicación e interacción (Chat, Email, WhatsApp y Google Calendar).
+  version: 1.0.0
+servers:
+  - url: /api
+    description: Servidor Local / Base de Rutas en Next.js
+
+tags:
+  - name: Chat
+    description: Canales de mensajería en tiempo real dentro de la plataforma web. Mapea con app/api/mensajes/
+  - name: Email
+    description: Envío de resúmenes impositivos y recepción de respuestas de clientes. Mapea con app/api/emails/
+  - name: WhatsApp
+    description: Envío de alertas de vencimiento y procesamiento de respuestas de clientes. Mapea con app/api/whatsapp/
+  - name: Calendar
+    description: Sincronización y gestión de turnos con Google Calendar mapeados sobre la tabla física 'turno'. Mapea con app/api/turnos/
+
+paths:
+  # =========================================================================
+  # 1. MODULO CHAT (Ruta física: app/api/mensajes/route.js)
+  # =========================================================================
+  /mensajes:
+    post:
+      summary: Transmitir un mensaje de chat interno
+      description: Envía y distribuye un mensaje en tiempo real a través de la plataforma web entre un cliente y un contador (sin persistencia histórica en base de datos).
+      tags:
+        - Chat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cuilEmisor
+                - cuilReceptor
+                - contenido
+              properties:
+                cuilEmisor:
+                  type: integer
+                  example: 20123456781
+                  description: Debe coincidir con el CUIL_usuario de la tabla usuario (Neon DB).
+                cuilReceptor:
+                  type: integer
+                  example: 27123456789
+                  description: Debe coincidir con el CUIL_usuario de la tabla usuario (Neon DB).
+                contenido:
+                  type: string
+                  example: "Hola, ya subí el comprobante de la liquidación de IVA."
+      responses:
+        '201':
+          description: Mensaje transmitido con éxito en tiempo real.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  idMensajeTransitorio:
+                    type: string
+                    format: uuid
+                    example: "3b291a14-722a-4122-b913-912a73315a67"
+                  enviadoEn:
+                    type: string
+                    format: date-time
+                    example: "2026-06-03T14:15:00Z"
+        '400':
+          description: Estructura de mensaje inválida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Token JWT de Clerk inválido o ausente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # =========================================================================
+  # 2. MODULO EMAIL
+  # =========================================================================
+  /emails/notificaciones: # Ruta física: app/api/emails/notificaciones/route.js
+    post:
+      summary: Enviar correo electrónico saliente al cliente
+      description: Despacha una notificación formal desde el estudio hacia el email registrado del cliente.
+      tags:
+        - Email
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emailDestinatario
+                - asunto
+                - cuerpo
+              properties:
+                emailDestinatario:
+                  type: string
+                  format: email
+                  example: cliente@estudio.com
+                asunto:
+                  type: string
+                  example: "Resumen Impositivo Mensual"
+                cuerpo:
+                  type: string
+                  example: "Estimado cliente, se encuentra disponible su liquidación."
+      responses:
+        '202':
+          description: Correo aceptado en la cola del proveedor externo gratuito.
+
+  /emails/entrantes: # Ruta física: app/api/emails/entrantes/route.js
+    post:
+      summary: Recibir respuesta de correo electrónico (Webhook)
+      description: Recibe la respuesta del cliente. El backend busca el remitente en la columna 'email' de la tabla 'usuario' para identificarlo y notificar al contador en la interfaz.
+      tags:
+        - Email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - deEmail
+                - asunto
+                - textoCuerpo
+              properties:
+                deEmail:
+                  type: string
+                  format: email
+                  example: cliente@estudio.com
+                asunto:
+                  type: string
+                  example: "Re: Resumen Impositivo"
+                textoCuerpo:
+                  type: string
+                  example: "Hola, muchas gracias. Mañana realizo el pago."
+      responses:
+        '200':
+          description: Respuesta de correo procesada y redirigida exitosamente.
+        '404':
+          description: El email remitente no corresponde a ningún usuario registrado en el sistema.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # =========================================================================
+  # 3. MODULO WHATSAPP
+  # =========================================================================
+  /whatsapp/alertas: # Ruta física: app/api/whatsapp/alertas/route.js
+    post:
+      summary: Enviar mensaje saliente por WhatsApp
+      description: Envía una alerta automatizada de vencimiento utilizando el número de teléfono nativo del cliente.
+      tags:
+        - WhatsApp
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - numeroTelefono
+                - mensajeTexto
+              properties:
+                numeroTelefono:
+                  type: integer
+                  example: 542914555555
+                  description: Corresponde al atributo 'telefono' (INTEGER) de la tabla 'usuario'.
+                mensajeTexto:
+                  type: string
+                  example: "Su liquidación de Ingresos Brutos vence en 48hs."
+      responses:
+        '202':
+          description: Alerta aceptada por el gateway externo.
+
+  /whatsapp/webhook: # Ruta física: app/api/whatsapp/webhook/route.js
+    post:
+      summary: Recibir mensajes desde WhatsApp (Webhook de Meta)
+      description: Meta invoca esta ruta pública cuando el cliente responde desde su celular. El backend toma el 'telefonoRemitente' y lo mapea con 'usuario.telefono'.
+      tags:
+        - WhatsApp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - telefonoRemitente
+                - texto
+              properties:
+                telefonoRemitente:
+                  type: integer
+                  example: 542914555555
+                  description: Clave de búsqueda para matchear con el campo 'telefono' de la base de datos.
+                texto:
+                  type: string
+                  example: "Hola! ¿Me podés pasar el link de nuevo?"
+      responses:
+        '200':
+          description: Evento recibido y despachado al frontend de React en tiempo real.
+        '404':
+          description: El teléfono remitente no pertenece a ningún usuario activo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # =========================================================================
+  # 4. MODULO GOOGLE CALENDAR (Ruta física: app/api/turnos/route.js)
+  # =========================================================================
+  /turnos:
+    post:
+      summary: Agendar y sincronizar turno en Google Calendar
+      description: Crea un evento en Google Calendar reflejando la inserción correspondiente en la tabla física 'turno'.
+      tags:
+        - Calendar
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cuilCliente
+                - cuilContador
+                - fecha
+                - hora
+              properties:
+                cuilCliente:
+                  type: integer
+                  example: 20123456781
+                  description: Atributo 'cuil_cliente' de la tabla 'turno'.
+                cuilContador:
+                  type: integer
+                  example: 27123456789
+                  description: Atributo 'cuil_contador' de la tabla 'turno'.
+                fecha:
+                  type: string
+                  format: date
+                  example: "2026-06-15"
+                  description: Atributo 'fecha' (DATE) de la tabla 'turno'.
+                hora:
+                  type: string
+                  example: "10:00:00"
+                  description: Atributo 'hora' (TIME) de la tabla 'turno'.
+      responses:
+        '201':
+          description: Sincronización con Google Calendar realizada con éxito.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estadoSincronizacion:
+                    type: string
+                    example: "SYNCHRONIZED"
+        '409':
+          description: Conflicto de disponibilidad (Clave primaria duplicada en la tabla 'turno').
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Eliminar turno de Google Calendar por clave compuesta
+      description: Cancela y remueve el evento en Google Calendar utilizando los atributos de la PK compuesta de la tabla 'turno' enviados por Query Parameters.
+      tags:
+        - Calendar
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: cuilCliente
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: cuilContador
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: fecha
+          required: true
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: hora
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Evento eliminado satisfactoriamente de Google Calendar. Sin cuerpo de respuesta.
+        '404':
+          description: El turno especificado con esa clave compuesta no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+# =========================================================================
+# COMPONENTES REUTILIZABLES
+# =========================================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: USUARIO_NO_REGISTRADO
+              description: Código de error semántico en SNAKE_UPPER_CASE.
+            message:
+              type: string
+              example: "El CUIL, correo o teléfono ingresado no corresponde a ningún registro activo."
