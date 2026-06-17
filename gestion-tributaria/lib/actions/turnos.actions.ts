@@ -71,7 +71,7 @@ export async function editarTurno(data: {
     if (nuevaFechaHora < new Date()) {
       return { error: "No se puede modificar el turno a una fecha u hora que ya pasó." };
     }
-    
+
      const turnoActual = await db.turno.findFirst({
       where: {
         fecha: new Date(data.fechaActual),
@@ -219,6 +219,53 @@ export async function cancelarTurno(data: {
     return { success: true };
   } catch {
     return { error: "Error al reservar el turno." };
+  }
+}
+
+//cliente cancela su propio turno reservado
+export async function cancelarTurnoCliente(data: {
+  fecha: string;
+  hora: string;
+  cuilContador: string;
+}) {
+  const permiso = await verificarRol("cliente");
+  if (permiso.error) return { error: permiso.error };
+
+  const { userId } = await auth();
+
+  try {
+    const cliente = await db.cliente.findFirst({ where: { clerk_id: userId! } });
+    if (!cliente) return { error: "Cliente no registrado." };
+
+    const horaDate = new Date(`1970-01-01T${data.hora}:00.000Z`);
+
+    const turno = await db.turno.findFirst({
+      where: {
+        fecha: new Date(data.fecha),
+        hora: horaDate,
+        cuil_contador: BigInt(data.cuilContador),
+        cuil_cliente: cliente.cuil, // solo puede cancelar SU turno
+      },
+    });
+    if (!turno) return { error: "Turno no encontrado o no te pertenece." };
+
+    // pendiente notificar al contador (turno cancelado) 
+
+    await db.turno.update({
+      where: {
+        fecha_hora_cuil_contador: {
+          fecha: new Date(data.fecha),
+          hora: horaDate,
+          cuil_contador: BigInt(data.cuilContador),
+        },
+      },
+      data: { cuil_cliente: null }, // vuelve a estar disponible
+    });
+
+    revalidatePath("/dashboard/turnos");
+    return { success: true };
+  } catch {
+    return { error: "Error al cancelar el turno." };
   }
 }
 
