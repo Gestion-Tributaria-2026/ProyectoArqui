@@ -4,11 +4,15 @@ import { db } from "../../../lib/prisma";
 import { Calendar } from "lucide-react";
 import TurnoForm from "./_components/turno-form";
 import TurnosAdminList from "./_components/turnos-admin-list";
+import { limpiarTurnosVencidos } from "../../../lib/actions/turnos.actions";
 
 export default async function TurnosPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
+
+  await limpiarTurnosVencidos(); 
+  
   const user = await currentUser();
   const nombreUsuario = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Usuario";
   
