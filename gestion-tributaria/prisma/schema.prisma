@@ -53,12 +53,12 @@ model entidad_tributaria {
 
 model estudio_contable {
   id_estudio Int        @id @default(autoincrement())
-  direccion  String?
-  email      String?
   nombre     String?
   telefono   String?
-  cliente    cliente[]
+  email      String?
+  direccion  String?
   contador   contador[]
+  cliente    cliente[]
 }
 
 model impuesto {
