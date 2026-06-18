@@ -10,8 +10,13 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 const clerkHandler = clerkMiddleware(async (auth, request) => {
-  const { userId } = await auth()
   const currentUrl = new URL(request.url)
+
+  if (currentUrl.pathname.startsWith('/api/cron')) {
+    return NextResponse.next()
+  }
+
+  const { userId } = await auth()
 
   // Si ya está logueado y accede a sign-in/sign-up, lo mandamos al dashboard
   if (userId && (currentUrl.pathname.startsWith('/sign-in') || currentUrl.pathname.startsWith('/sign-up'))) {
