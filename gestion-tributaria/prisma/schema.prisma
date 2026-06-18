@@ -47,8 +47,8 @@ model entidad_tributaria {
   id_entidad   Int            @id @default(autoincrement())
   nombre       String?
   url          String?
-  inscripto_en inscripto_en[]
   impuesto     impuesto[]
+  inscripto_en inscripto_en[]
 }
 
 model estudio_contable {
@@ -62,11 +62,11 @@ model estudio_contable {
 }
 
 model impuesto {
-  id_impuesto         Int                  @id @default(autoincrement())
-  formato             String?
-  id_entidad          Int?
-  entidad_tributaria  entidad_tributaria?  @relation(fields: [id_entidad], references: [id_entidad], onDelete: NoAction, onUpdate: NoAction, map: "id_entidad_impuesto")
-  liquidacion         liquidacion[]
+  id_impuesto        Int                 @id @default(autoincrement())
+  formato            String?
+  id_entidad         Int?
+  entidad_tributaria entidad_tributaria? @relation(fields: [id_entidad], references: [id_entidad], onDelete: NoAction, onUpdate: NoAction, map: "id_entidad_impuesto")
+  liquidacion        liquidacion[]
 }
 
 model inscripto_en {
